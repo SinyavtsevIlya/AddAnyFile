@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -14,6 +15,7 @@ namespace MadsKristensen.AddAnyFile
         static readonly string _folder;
         static readonly string[] _templateFiles;
         const string _defaultExt = ".txt";
+        const int _lacalTemplateSearchDepth = 3;
 
         static TemplateMap()
         {
@@ -29,19 +31,29 @@ namespace MadsKristensen.AddAnyFile
             string safeName = name.StartsWith(".") ? name : Path.GetFileNameWithoutExtension(file);
             string relative = PackageUtilities.MakeRelative(project.GetRootFolder(), Path.GetDirectoryName(file));
 
+            string localTemplate = SearchForLocalTemplate(Path.GetDirectoryName(file), relative, _lacalTemplateSearchDepth);
+
             string templateFile = null;
 
-            // Look for direct file name matches
-            if (_templateFiles.Any(f => Path.GetFileName(f).Equals(name + _defaultExt, StringComparison.OrdinalIgnoreCase)))
+            // Look for the local template
+            if (!string.IsNullOrEmpty(localTemplate))
             {
-                templateFile = GetTemplate(name);
+                templateFile = localTemplate;
             }
-
-            // Look for file extension matches
-            else if (_templateFiles.Any(f => Path.GetFileName(f).Equals(extension + _defaultExt, StringComparison.OrdinalIgnoreCase)))
+            else
             {
-                string tmpl = AdjustForSpecific(safeName, extension);
-                templateFile = GetTemplate(tmpl);
+                // Look for direct file name matches
+                if (_templateFiles.Any(f => Path.GetFileName(f).Equals(name + _defaultExt, StringComparison.OrdinalIgnoreCase)))
+                {
+                    templateFile = GetTemplate(name);
+                }
+
+                // Look for file extension matches
+                else if (_templateFiles.Any(f => Path.GetFileName(f).Equals(extension + _defaultExt, StringComparison.OrdinalIgnoreCase)))
+                {
+                    string tmpl = AdjustForSpecific(safeName, extension);
+                    templateFile = GetTemplate(tmpl);
+                }
             }
 
             string template = await ReplaceTokensAsync(project, safeName, relative, templateFile);
@@ -89,6 +101,43 @@ namespace MadsKristensen.AddAnyFile
                 return extension += "-interface";
 
             return extension;
+        }
+
+        private static IEnumerable<DirectoryInfo> GetAllParentDirectories(DirectoryInfo directoryToScan)
+        {
+            Stack<DirectoryInfo> ret = new Stack<DirectoryInfo>();
+            GetAllParentDirectories(directoryToScan, ref ret);
+            return ret;
+        }
+
+        private static void GetAllParentDirectories(DirectoryInfo directoryToScan, ref Stack<DirectoryInfo> directories)
+        {
+            if (directoryToScan == null || directoryToScan.Name == directoryToScan.Root.Name)
+                return;
+
+            directories.Push(directoryToScan);
+            GetAllParentDirectories(directoryToScan.Parent, ref directories);
+        }
+        
+        private static string SearchForLocalTemplate(string path, string relative, int depth)
+        {
+            var rootDirectory = new DirectoryInfo(relative).Root;
+            var currentDirectory = new DirectoryInfo(path);
+
+            for (int i = 0; i < depth; i++)
+            {
+                var template = Directory.GetFiles(currentDirectory.FullName, "*.template", SearchOption.TopDirectoryOnly).FirstOrDefault();
+                if (string.IsNullOrEmpty(template))
+                {
+                    if (currentDirectory.Name == rootDirectory.Name) return null;
+                    currentDirectory = currentDirectory.Parent;
+                }
+                else
+                {
+                    return template;
+                }
+            }
+            return null;
         }
     }
 }
