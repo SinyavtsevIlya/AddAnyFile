@@ -1,54 +1,16 @@
 # Add Any File
 
-[![Build status](https://ci.appveyor.com/api/projects/status/252jpryc38qah37x?svg=true)](https://ci.appveyor.com/project/madskristensen/addanyfile)
+This is fork of [**Add New File**](https://marketplace.visualstudio.com/items?itemName=MadsKristensen.AddNewFile) extension which may use local templates.
 
-Download the extension at the
-[VS Gallery](https://marketplace.visualstudio.com/items?itemName=MadsKristensen.AddNewFile)
-or get the
-[nightly build](http://vsixgallery.com/extension/2E78AA18-E864-4FBB-B8C8-6186FC865DB3/)
+## How to use
 
--------------------------------------------------
+Just create a new `.template` file in your target folder and now any file created using **AddNewFile** command will use this local template instead of global predefined templates like `.cs` or `.html`
 
-A Visual Studio extension for easily adding new files to any project. Simply hit Shift+F2 to create an empty file in the
-selected folder or in the same folder as the selected file.
+This is extremely helpful when you layout your project structure by categories, like `Serviсes`, `Systems`, `Components` etc.
 
-See the [changelog](CHANGELOG.md) for updates and roadmap.
+### Tips: 
+- `{itemname}` and `{namespace}` tags inside your template will be replaced with the file name.
 
-### Features
+- **"Exlude From Project"** your template in order not to mess with an actual code. You always can press **Show All Files** button in the **Solution Explorer** to see and modify it.
 
-- Easily create any file with any file extension
-- Create files starting with a dot like `.gitignore`
-- Create deeper folder structures easily if required
-- Create folders when the entered name ends with a /
-
-![Add new file dialog](art/dialog.png)
-
-### Show the dialog
-
-A new button is added to the context menu in Solution Explorer.
-
-![Add new file dialog](art/menu.png)
-
-You can either click that button or use the keybord shortcut **Shift+F2**.
-
-### Create folders
-
-Create additional folders for your file by using forward-slash to
-specify the structure.
-
-For example, by typing **scripts/test.js** in the dialog, the
-folder **scripts** is created if it doesn't exist and the file
-**test.js** is then placed into it.
-
-## Contribute
-Check out the [contribution guidelines](.github/CONTRIBUTING.md)
-if you want to contribute to this project.
-
-For cloning and building this project yourself, make sure
-to install the
-[Extensibility Tools 2015](https://marketplace.visualstudio.com/items?itemName=MadsKristensen.ExtensibilityTools)
-extension for Visual Studio which enables some features
-used by this project.
-
-## License
-[Apache 2.0](LICENSE)
+- For **Unity** users: to prevent Unity from including back you templates simply name it starting with `.` e.g. `.services.template`. This will make your template invisible for Unity. 
