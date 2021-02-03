@@ -22,6 +22,7 @@ namespace MadsKristensen.AddAnyFile
     [Guid(PackageGuids.guidAddAnyFilePkgString)]
     public sealed class AddAnyFilePackage : AsyncPackage
     {
+        public const string Dummy = "__dummy__";
         public static DTE2 _dte;
 
         protected override async System.Threading.Tasks.Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
@@ -68,7 +69,7 @@ namespace MadsKristensen.AddAnyFile
 
                 if (input.EndsWith("\\", StringComparison.Ordinal))
                 {
-                    input = input + "__dummy__";
+                    input = input + Dummy;
                 }
 
                 var file = new FileInfo(Path.Combine(folder, input));
@@ -78,7 +79,8 @@ namespace MadsKristensen.AddAnyFile
 
                 if (!file.Exists)
                 {
-                    int position = await WriteFileAsync(project, file.FullName);
+                    TemplateInfo template = await WriteFileAsync(project, file.FullName);
+                    file = new FileInfo(template.WritePath);
 
                     try
                     {
@@ -95,7 +97,7 @@ namespace MadsKristensen.AddAnyFile
                             projectItem = project.AddFileToProject(file);
                         }
 
-                        if (file.FullName.EndsWith("__dummy__"))
+                        if (file.FullName.EndsWith(Dummy))
                         {
                             projectItem?.Delete();
                             continue;
@@ -104,12 +106,12 @@ namespace MadsKristensen.AddAnyFile
                         VsShellUtilities.OpenDocument(this, file.FullName);
 
                         // Move cursor into position
-                        if (position > 0)
+                        if (template.CursorPosition > 0)
                         {
                             Microsoft.VisualStudio.Text.Editor.IWpfTextView view = ProjectHelpers.GetCurentTextView();
 
                             if (view != null)
-                                view.Caret.MoveTo(new SnapshotPoint(view.TextBuffer.CurrentSnapshot, position));
+                                view.Caret.MoveTo(new SnapshotPoint(view.TextBuffer.CurrentSnapshot, template.CursorPosition ));
                         }
 
                         _dte.ExecuteCommand("SolutionExplorer.SyncWithActiveDocument");
@@ -127,27 +129,30 @@ namespace MadsKristensen.AddAnyFile
             }
         }
 
-        private static async Task<int> WriteFileAsync(Project project, string file)
+        private static async Task<TemplateInfo> WriteFileAsync(Project project, string file)
         {
-            string extension = Path.GetExtension(file);
-            string template = await TemplateMap.GetTemplateFilePathAsync(project, file);
+            TemplateInfo template = await TemplateMap.GetTemplateInfoAsync(project, file);
 
-            if (!string.IsNullOrEmpty(template))
+            string content = template.Content;
+
+            if (!string.IsNullOrEmpty(content))
             {
-                int index = template.IndexOf('$');
+                int index = content.IndexOf('$');
 
                 if (index > -1)
                 {
-                    template = template.Remove(index, 1);
+                    content = content.Remove(index, 1);
                 }
 
-                await WriteToDiskAsync(file, template);
-                return index;
+                await WriteToDiskAsync(template.WritePath, content);
+                template.CursorPosition = index;
+                return template;
             }
 
-            await WriteToDiskAsync(file, string.Empty);
+            await WriteToDiskAsync(template.WritePath, string.Empty);
 
-            return 0;
+            template.CursorPosition = 0;
+            return template;
         }
 
         private static async System.Threading.Tasks.Task WriteToDiskAsync(string file, string content)

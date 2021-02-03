@@ -1,9 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
     <Metadata>
-        <Identity Id="9A791ED5-0A3F-49CF-A290-B857C5F9A5BC" Version="3.6" Language="en-US" Publisher="Ilya Sinyavtsev" />
+        <Identity Id="9A791ED5-0A3F-49CF-A290-B857C5F9A5BC" Version="3.7" Language="en-US" Publisher="Ilya Sinyavtsev" />
         <DisplayName>Add New File (Local Templates)</DisplayName>
-        <Description xml:space="preserve">This is a fork of "Add New File" extension supporting local templates.</Description>
+        <Description xml:space="preserve">Create new files using local templates workflow (Forked from "Add New File")</Description>
         <MoreInfo>https://marketplace.visualstudio.com/items?itemName=IlyaSinyavtsev.AddNewFileLocalTemplates</MoreInfo>
         <License>Resources\LICENSE</License>
         <ReleaseNotes>https://github.com/madskristensen/AddAnyFile/blob/master/CHANGELOG.md</ReleaseNotes>

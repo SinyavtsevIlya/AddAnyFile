@@ -10,12 +10,26 @@ using Microsoft.VisualStudio.Shell;
 
 namespace MadsKristensen.AddAnyFile
 {
+    public class TemplateInfo
+    {
+        public string Content;
+        public string TemplateFullName;
+        public string LongItemName;
+        public string ShortItemName;
+        public bool HasReplacementTitle;
+        public string WritePath;
+        public bool IsLocal;
+        public string Extension;
+        public int CursorPosition;
+    }
+
     static class TemplateMap
     {
         static readonly string _folder;
         static readonly string[] _templateFiles;
         const string _defaultExt = ".txt";
-        const int _lacalTemplateSearchDepth = 3;
+        const string _csExt = ".cs";
+        const int _localTemplateSearchDepth = 3;
 
         static TemplateMap()
         {
@@ -24,51 +38,67 @@ namespace MadsKristensen.AddAnyFile
             _templateFiles = Directory.GetFiles(_folder, "*" + _defaultExt, SearchOption.AllDirectories);
         }
 
-        public static async Task<string> GetTemplateFilePathAsync(Project project, string file)
+        public static async Task<TemplateInfo> GetTemplateInfoAsync(Project project, string file)
         {
+            TemplateInfo result = new TemplateInfo();
             string extension = Path.GetExtension(file).ToLowerInvariant();
             string name = Path.GetFileName(file);
             string safeName = name.StartsWith(".") ? name : Path.GetFileNameWithoutExtension(file);
             string relative = PackageUtilities.MakeRelative(project.GetRootFolder(), Path.GetDirectoryName(file));
+            string folder = Path.GetDirectoryName(file);
 
-            string localTemplate = SearchForLocalTemplate(Path.GetDirectoryName(file), relative, _lacalTemplateSearchDepth);
+            string localTemplate = SearchForLocalTemplate(Path.GetDirectoryName(file), relative, _localTemplateSearchDepth);
 
-            string templateFile = null;
+            result.IsLocal = !string.IsNullOrEmpty(localTemplate);
 
-            // Look for the local template
-            if (!string.IsNullOrEmpty(localTemplate))
+            string templateFullName = null;
+
+            if (name == AddAnyFilePackage.Dummy)
             {
-                templateFile = localTemplate;
+                
+            }
+            // Look for the local template
+            else if (result.IsLocal)
+            {
+                templateFullName = localTemplate;
             }
             else
             {
                 // Look for direct file name matches
                 if (_templateFiles.Any(f => Path.GetFileName(f).Equals(name + _defaultExt, StringComparison.OrdinalIgnoreCase)))
                 {
-                    templateFile = GetTemplate(name);
+                    templateFullName = GetTemplate(name);
                 }
 
                 // Look for file extension matches
                 else if (_templateFiles.Any(f => Path.GetFileName(f).Equals(extension + _defaultExt, StringComparison.OrdinalIgnoreCase)))
                 {
                     string tmpl = AdjustForSpecific(safeName, extension);
-                    templateFile = GetTemplate(tmpl);
+                    templateFullName = GetTemplate(tmpl);
                 }
             }
 
-            string template = await ReplaceTokensAsync(project, safeName, relative, templateFile);
-            return NormalizeLineEndings(template);
+            if (name != AddAnyFilePackage.Dummy) result.Extension = string.IsNullOrEmpty(extension) ? _csExt : extension;
+
+            HandleItemName(safeName, templateFullName, result);
+            result.WritePath = result.IsLocal? Path.Combine(folder, result.LongItemName + result.Extension) : file; 
+            string templateContent = await ReplaceTokensAsync(project, result, relative, templateFullName);
+            result.TemplateFullName = templateFullName;
+            result.Content = NormalizeLineEndings(templateContent);
+            return result;
         }
+
+
 
         private static string GetTemplate(string name)
         {
             return Path.Combine(_folder, name + _defaultExt);
         }
 
-        private static async Task<string> ReplaceTokensAsync(Project project, string name, string relative, string templateFile)
+        private static async Task<string> ReplaceTokensAsync(Project project, TemplateInfo template, string relative, string templateFullName)
         {
-            if (string.IsNullOrEmpty(templateFile))
-                return templateFile;
+            if (string.IsNullOrEmpty(templateFullName))
+                return templateFullName;
 
             string rootNs = project.GetRootNamespace();
             string ns = string.IsNullOrEmpty(rootNs) ? "MyNamespace" : rootNs;
@@ -78,12 +108,14 @@ namespace MadsKristensen.AddAnyFile
                 ns += "." + ProjectHelpers.CleanNameSpace(relative);
             }
 
-            using (var reader = new StreamReader(templateFile))
+            using (var reader = new StreamReader(templateFullName))
             {
                 string content = await reader.ReadToEndAsync();
 
+                var itemname = template.ShortItemName;
+
                 return content.Replace("{namespace}", ns)
-                              .Replace("{itemname}", name);
+                              .Replace("{itemname}", itemname);
             }
         }
 
@@ -118,7 +150,43 @@ namespace MadsKristensen.AddAnyFile
             directories.Push(directoryToScan);
             GetAllParentDirectories(directoryToScan.Parent, ref directories);
         }
-        
+
+        private static void HandleItemName(string inputName, string templateFullName, TemplateInfo template)
+        {
+            const string replacement = "{itemname}";
+                
+            if (templateFullName == null)
+            {
+                template.LongItemName = inputName;
+                template.ShortItemName = inputName;
+            }
+            else if (templateFullName.Contains(replacement))
+            {
+                template.HasReplacementTitle = true;
+
+                var rawName = Path.GetFileNameWithoutExtension(templateFullName)
+                    .Replace(".", "");
+
+                var prefix = rawName.Replace(replacement, "");
+
+                // if the user input filename already contains prefix
+                if (inputName.Contains(prefix))
+                {
+                    template.ShortItemName = inputName.Replace(prefix, "");
+                    template.LongItemName = inputName;
+                }
+                else
+                {
+                    template.ShortItemName = inputName;
+                    template.LongItemName = rawName.Replace(replacement, inputName);
+                }
+            } else
+            {
+                template.LongItemName = inputName;
+                template.ShortItemName = inputName;
+            }
+        }
+
         private static string SearchForLocalTemplate(string path, string relative, int depth)
         {
             var rootDirectory = new DirectoryInfo(relative).Root;
